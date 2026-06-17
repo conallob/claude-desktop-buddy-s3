@@ -1,0 +1,99 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Version tag (e.g. v1.0.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install PlatformIO and esptool
+        run: pip install platformio==6.1.19 esptool
+
+      - name: Build firmware
+        run: pio run -e m5stick-s3
+
+      - name: Build LittleFS image
+        run: pio run -e m5stick-s3 -t buildfs
+
+      - name: Merge firmware into single flashable binary
+        run: |
+          python3 -m esptool --chip esp32s3 merge_bin \
+            -o merged-firmware.bin \
+            --flash_mode qio \
+            --flash_size 8MB \
+            0x0    .pio/build/m5stick-s3/bootloader.bin \
+            0x8000 .pio/build/m5stick-s3/partitions.bin \
+            0x10000 .pio/build/m5stick-s3/firmware.bin
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Stage release assets
+        run: |
+          mkdir -p release
+          cp merged-firmware.bin                       release/merged-firmware.bin
+          cp .pio/build/m5stick-s3/firmware.bin        release/firmware.bin
+          cp .pio/build/m5stick-s3/bootloader.bin      release/bootloader.bin
+          cp .pio/build/m5stick-s3/partitions.bin      release/partitions.bin
+          cp .pio/build/m5stick-s3/littlefs.bin        release/littlefs.bin
+
+      - name: Generate manifest.json
+        run: |
+          VERSION="${{ steps.version.outputs.tag }}"
+          REPO="https://github.com/${{ github.repository }}"
+          cat > release/manifest.json <<EOF
+          {
+            "name": "Claude Desktop Buddy S3",
+            "version": "${VERSION}",
+            "new_install_prompt_erase": true,
+            "builds": [
+              {
+                "chipFamily": "ESP32-S3",
+                "parts": [
+                  {
+                    "path": "${REPO}/releases/download/${VERSION}/merged-firmware.bin",
+                    "offset": 0
+                  }
+                ]
+              }
+            ]
+          }
+          EOF
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          generate_release_notes: true
+          files: |
+            release/merged-firmware.bin
+            release/firmware.bin
+            release/bootloader.bin
+            release/partitions.bin
+            release/littlefs.bin
+            release/manifest.json

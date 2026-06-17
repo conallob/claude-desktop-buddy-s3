@@ -1,0 +1,16 @@
+{
+  "name": "Claude Desktop Buddy S3",
+  "version": "latest",
+  "new_install_prompt_erase": true,
+  "builds": [
+    {
+      "chipFamily": "ESP32-S3",
+      "parts": [
+        {
+          "path": "https://github.com/conallob/claude-desktop-buddy-s3/releases/latest/download/merged-firmware.bin",
+          "offset": 0
+        }
+      ]
+    }
+  ]
+}
