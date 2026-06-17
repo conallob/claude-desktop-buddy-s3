@@ -4,6 +4,7 @@
 #include "ble_bridge.h"
 #include "data.h"
 #include "buddy.h"
+#include "mqtt_bridge.h"
 
 TFT_eSprite spr = TFT_eSprite(&M5.Lcd);
 
@@ -164,7 +165,10 @@ static void applySetting(uint8_t idx) {
       // hard-off someday, stop advertising via BLEDevice::getAdvertising().
       s.bt = !s.bt;
       break;
-    case 3: s.wifi = !s.wifi; break;   // stored only — no WiFi stack linked
+    case 3:
+      s.wifi = !s.wifi;
+      if (s.wifi) mqttStart(); else mqttStop();
+      break;
     case 4: s.led = !s.led; break;
     case 5: s.hud = !s.hud; break;
     case 6: s.clockRot = (s.clockRot + 1) % 3; break;
@@ -984,16 +988,26 @@ void setup() {
     delay(1800);
   }
 
+  if (settings().wifi) mqttStart();
+
   Serial.printf("buddy: %s\n", buddyMode ? "ASCII mode" : "GIF character loaded");
 }
+
+static PersonaState _lastPublishedState = P_SLEEP;
+static uint32_t     _lastHeartbeatMs    = 0;
 
 void loop() {
   M5.update();
   t++;
   uint32_t now = millis();
 
+  mqttLoop();
+
   dataPoll(&tama);
-  if (statsPollLevelUp()) triggerOneShot(P_CELEBRATE, 3000);
+  if (statsPollLevelUp()) {
+    triggerOneShot(P_CELEBRATE, 3000);
+    mqttPublishLevelUp(stats().level, stats().tokens);
+  }
   baseState = derive(tama);
 
   // After waking the screen, hold sleep for 12s so users see the wake-up
@@ -1001,6 +1015,16 @@ void loop() {
   if (baseState == P_IDLE && (int32_t)(now - wakeTransitionUntil) < 0) baseState = P_SLEEP;
 
   if ((int32_t)(now - oneShotUntil) >= 0) activeState = baseState;
+
+  if (activeState != _lastPublishedState) {
+    mqttPublishState(stateNames[activeState]);
+    _lastPublishedState = activeState;
+  }
+  if (now - _lastHeartbeatMs >= 60000) {
+    _lastHeartbeatMs = now;
+    mqttPublishHeartbeat(stateNames[activeState], stats().level, stats().tokens,
+                         stats().approvals, stats().denials);
+  }
 
   // LED: pulse on attention, otherwise off
   if (activeState == P_ATTENTION && settings().led) {
@@ -1027,6 +1051,7 @@ void loop() {
     responseSent = false;
     if (tama.promptId[0]) {
       promptArrivedMs = millis();
+      mqttPublishPermission(tama.promptTool, tama.promptHint);
       wake();
       beep(1200, 80);   // alert chirp
       // Jump to the approval screen no matter what was open — drawApproval
@@ -1084,6 +1109,7 @@ void loop() {
         responseSent = true;
         uint32_t tookS = (millis() - promptArrivedMs) / 1000;
         statsOnApproval(tookS);
+        mqttPublishDecision(tama.promptId, "once", tookS);
         beep(2400, 60);
         if (tookS < 5) triggerOneShot(P_HEART, 2000);
       } else if (resetOpen) {
@@ -1116,6 +1142,7 @@ void loop() {
       sendCmd(cmd);
       responseSent = true;
       statsOnDenial();
+      mqttPublishDecision(tama.promptId, "deny", (millis() - promptArrivedMs) / 1000);
       beep(600, 60);
     } else if (resetOpen) {
       beep(2400, 30);
