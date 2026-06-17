@@ -2,23 +2,16 @@
 
 ENV := m5stick-s3
 
-# PlatformIO requires Python 3.10–3.13. Emit a clear error if 3.14+ is active.
-PYTHON_MINOR := $(shell python3 -c "import sys; print(sys.version_info.minor)")
-PYTHON_MAJOR := $(shell python3 -c "import sys; print(sys.version_info.major)")
-PYTHON_OK := $(shell python3 -c "import sys; print(int(3==sys.version_info.major and 10<=sys.version_info.minor<=13))")
-
+# PlatformIO requires Python 3.10–3.13.
+# Check runs inside the recipe shell so pyenv/mise shims are active.
 check-python:
-	@if [ "$(PYTHON_OK)" != "1" ]; then \
-		echo ""; \
-		echo "ERROR: PlatformIO requires Python 3.10–3.13."; \
-		echo "       Active version: $(PYTHON_MAJOR).$(PYTHON_MINOR)"; \
-		echo ""; \
-		echo "Fix: install pyenv or mise and let .python-version select 3.13:"; \
-		echo "  brew install pyenv && pyenv install 3.13 && pyenv rehash"; \
-		echo "  or: brew install mise && mise install"; \
-		echo ""; \
-		exit 1; \
-	fi
+	@python3 -c "\
+import sys; \
+maj, min_ = sys.version_info[:2]; \
+ok = maj == 3 and 10 <= min_ <= 13; \
+ok or print(f'\nERROR: PlatformIO requires Python 3.10-3.13.\n       Active version: {maj}.{min_}\n\nFix: let .python-version select 3.13 via pyenv or mise:\n  brew install pyenv && pyenv install 3.13 && pyenv rehash\n  or: brew install mise && mise install\n'); \
+raise SystemExit(0 if ok else 1) \
+"
 
 # Default: build firmware
 all: build
