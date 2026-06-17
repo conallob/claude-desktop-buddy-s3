@@ -47,6 +47,15 @@ jobs:
         if: hashFiles('data/**') != ''
         run: pio run -e m5stick-s3 -t buildfs
 
+      - name: Diagnostic - bootloader SHA256
+        run: |
+          echo "=== Bootloader SHA256 ==="
+          sha256sum .pio/build/m5stick-s3/bootloader.bin
+          echo "=== Bootloader size ==="
+          ls -la .pio/build/m5stick-s3/bootloader.bin
+          echo "=== Build environment ==="
+          pio run -e m5stick-s3 --list-targets 2>/dev/null || true
+
       - name: Merge firmware into single flashable binary
         run: |
           python3 -m esptool --chip esp32s3 merge_bin \

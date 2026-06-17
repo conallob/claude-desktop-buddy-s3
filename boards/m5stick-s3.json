@@ -11,7 +11,7 @@
     "flash_mode": "qio",
     "hwids": [["0x303A", "0x1001"]],
     "mcu": "esp32s3",
-    "variant": "esp32s3r8v"
+    "variant": "esp32s3"
   },
   "connectivity": ["wifi", "bluetooth"],
   "frameworks": ["arduino", "espidf"],
