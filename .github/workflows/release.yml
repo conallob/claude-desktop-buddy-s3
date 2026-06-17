@@ -44,6 +44,7 @@ jobs:
         run: pio run -e m5stick-s3
 
       - name: Build LittleFS image
+        if: hashFiles('data/**') != ''
         run: pio run -e m5stick-s3 -t buildfs
 
       - name: Merge firmware into single flashable binary
@@ -72,7 +73,10 @@ jobs:
           cp .pio/build/m5stick-s3/firmware.bin        release/firmware.bin
           cp .pio/build/m5stick-s3/bootloader.bin      release/bootloader.bin
           cp .pio/build/m5stick-s3/partitions.bin      release/partitions.bin
-          cp .pio/build/m5stick-s3/littlefs.bin        release/littlefs.bin
+
+      - name: Stage LittleFS image
+        if: hashFiles('data/**') != ''
+        run: cp .pio/build/m5stick-s3/littlefs.bin release/littlefs.bin
 
       - name: Generate manifest.json
         run: |
@@ -108,5 +112,5 @@ jobs:
             release/firmware.bin
             release/bootloader.bin
             release/partitions.bin
-            release/littlefs.bin
             release/manifest.json
+            release/littlefs.bin
