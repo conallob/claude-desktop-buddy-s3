@@ -1,7 +1,9 @@
 .PHONY: all build flash flash-fs monitor clean setup config help
 
 ENV := m5stick-s3
-PIO := pyenv exec pio
+# Invoke PlatformIO via the pyenv-selected Python so the interpreter is
+# always 3.13 regardless of which Python the system `pio` binary was built with.
+PIO := pyenv exec python3 -m platformio
 
 # Default: build firmware
 all: build
@@ -32,8 +34,9 @@ flash-monitor: flash monitor
 clean:
 	$(PIO) run -e $(ENV) -t clean
 
-## Install PlatformIO dependencies (libraries + toolchain)
+## Install PlatformIO into the pyenv Python and install project dependencies
 setup:
+	pyenv exec pip install platformio
 	$(PIO) pkg install -e $(ENV)
 
 ## Create wifi_config.h from the example file if it doesn't exist
