@@ -19,10 +19,14 @@ static WiFiClient   _wifiClient;
 static PubSubClient _mqttClient(_wifiClient);
 
 static bool _mqttWifiEnabled = false;   // controlled by settings().wifi
+static char _mqttDeviceId[16] = "";     // last 3 MAC bytes, e.g. "ab12cd"
 
 // Call once when WiFi setting is toggled on, or on boot if setting is on.
 inline void mqttStart() {
   _mqttWifiEnabled = true;
+  uint8_t mac[6];
+  esp_read_mac(mac, ESP_MAC_WIFI_STA);
+  snprintf(_mqttDeviceId, sizeof(_mqttDeviceId), "%02x%02x%02x", mac[3], mac[4], mac[5]);
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   _mqttClient.setServer(MQTT_HOST, MQTT_PORT);
@@ -67,7 +71,7 @@ inline void mqttLoop() {
   const char* pass = strlen(MQTT_PASSWORD) ? MQTT_PASSWORD : nullptr;
 
   // Client ID includes MAC suffix to avoid collisions on shared brokers.
-  uint8_t mac[6];
+  uint8_t mac[6];  // reuse mac local — _mqttDeviceId already set in mqttStart()
   esp_read_mac(mac, ESP_MAC_WIFI_STA);
   char clientId[24];
   snprintf(clientId, sizeof(clientId), "buddy-%02x%02x%02x", mac[3], mac[4], mac[5]);
@@ -75,11 +79,13 @@ inline void mqttLoop() {
   _mqttClient.connect(clientId, user, pass);
 }
 
-// Publish a JSON payload to <prefix>/events/<eventType>.
+// Publish a JSON payload to <prefix>/<device-id>/events/<eventType>.
+// Topics follow the form buddy/ab12cd/events/permission so each device
+// has its own subtree and you can wildcard across all: buddy/+/events/permission
 inline void mqttPublish(const char* eventType, const char* jsonPayload) {
   if (!mqttReady()) return;
-  char topic[64];
-  snprintf(topic, sizeof(topic), MQTT_TOPIC_PREFIX "/events/%s", eventType);
+  char topic[80];
+  snprintf(topic, sizeof(topic), MQTT_TOPIC_PREFIX "/%s/events/%s", _mqttDeviceId, eventType);
   _mqttClient.publish(topic, jsonPayload);
 }
 
