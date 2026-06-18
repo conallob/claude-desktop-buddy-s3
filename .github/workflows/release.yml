@@ -47,6 +47,16 @@ jobs:
         if: hashFiles('data/**') != ''
         run: pio run -e m5stick-s3 -t buildfs
 
+      - name: Use OPI PSRAM bootloader
+        run: |
+          OPI_BOOTLOADER="${HOME}/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_opi/bootloader.bin"
+          echo "=== Default bootloader SHA256 ==="
+          sha256sum .pio/build/m5stick-s3/bootloader.bin
+          echo "=== OPI bootloader SHA256 ==="
+          sha256sum "${OPI_BOOTLOADER}"
+          cp "${OPI_BOOTLOADER}" .pio/build/m5stick-s3/bootloader.bin
+          echo "=== Bootloader replaced ==="
+
       - name: Merge firmware into single flashable binary
         run: |
           python3 -m esptool --chip esp32s3 merge_bin \
