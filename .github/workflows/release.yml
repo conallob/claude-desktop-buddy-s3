@@ -49,10 +49,20 @@ jobs:
 
       - name: Use OPI PSRAM bootloader
         run: |
-          OPI_BOOTLOADER="${HOME}/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_opi/bootloader.bin"
           echo "=== Default bootloader SHA256 ==="
           sha256sum .pio/build/m5stick-s3/bootloader.bin
-          echo "=== OPI bootloader SHA256 ==="
+          echo "=== Available bootloaders in framework ==="
+          find "${HOME}/.platformio/packages/framework-arduinoespressif32" -name "bootloader.bin" | sort
+          echo "=== SDK esp32s3 directory ==="
+          ls "${HOME}/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/" 2>/dev/null || \
+            find "${HOME}/.platformio/packages/framework-arduinoespressif32/tools/sdk/" -maxdepth 2 -type d | sort
+          OPI_BOOTLOADER=$(find "${HOME}/.platformio/packages/framework-arduinoespressif32" -path "*/esp32s3/*opi*bootloader.bin" -o -path "*/esp32s3/*opi*/bootloader.bin" 2>/dev/null | head -1)
+          if [ -z "${OPI_BOOTLOADER}" ]; then
+            echo "ERROR: Could not find OPI bootloader — listing all esp32s3 bootloaders:"
+            find "${HOME}/.platformio/packages/framework-arduinoespressif32" -path "*/esp32s3*" -name "bootloader.bin" | sort
+            exit 1
+          fi
+          echo "=== Using OPI bootloader: ${OPI_BOOTLOADER} ==="
           sha256sum "${OPI_BOOTLOADER}"
           cp "${OPI_BOOTLOADER}" .pio/build/m5stick-s3/bootloader.bin
           echo "=== Bootloader replaced ==="
