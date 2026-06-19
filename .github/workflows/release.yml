@@ -49,23 +49,20 @@ jobs:
 
       - name: Use OPI PSRAM bootloader
         run: |
+          SDK_BIN="${HOME}/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/bin"
+          echo "=== Available bootloader ELFs ==="
+          ls -la "${SDK_BIN}/"
           echo "=== Default bootloader SHA256 ==="
           sha256sum .pio/build/m5stick-s3/bootloader.bin
-          echo "=== All bootloaders in framework ==="
-          find "${HOME}/.platformio/packages/framework-arduinoespressif32" -name "bootloader*.bin" | sort
-          echo "=== esp32s3 SDK directory contents ==="
-          find "${HOME}/.platformio/packages/framework-arduinoespressif32/tools/sdk" -maxdepth 3 -type d | sort
-          echo "=== Looking for any OPI-related files ==="
-          find "${HOME}/.platformio/packages/framework-arduinoespressif32" -iname "*opi*" | sort
-          OPI_BOOTLOADER=$(find "${HOME}/.platformio/packages/framework-arduinoespressif32" \( -path "*esp32s3*opi*bootloader*.bin" -o -path "*esp32s3*bootloader*opi*.bin" \) 2>/dev/null | head -1)
-          if [ -z "${OPI_BOOTLOADER}" ]; then
-            echo "WARNING: No OPI bootloader found — leaving default bootloader in place"
-          else
-            echo "=== Using OPI bootloader: ${OPI_BOOTLOADER} ==="
-            sha256sum "${OPI_BOOTLOADER}"
-            cp "${OPI_BOOTLOADER}" .pio/build/m5stick-s3/bootloader.bin
-            echo "=== Bootloader replaced ==="
-          fi
+          OPI_ELF="${SDK_BIN}/bootloader_opi_80m.elf"
+          echo "=== Converting OPI bootloader ELF to binary ==="
+          python3 -m esptool --chip esp32s3 elf2image \
+            --flash_mode qio --flash_freq 80m --flash_size 8MB \
+            -o bootloader_opi.bin "${OPI_ELF}"
+          echo "=== OPI bootloader binary SHA256 ==="
+          sha256sum bootloader_opi.bin
+          cp bootloader_opi.bin .pio/build/m5stick-s3/bootloader.bin
+          echo "=== Bootloader replaced ==="
 
       - name: Merge firmware into single flashable binary
         run: |
