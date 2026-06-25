@@ -38,7 +38,7 @@ jobs:
           EOF
 
       - name: Install PlatformIO and esptool
-        run: pip install platformio==6.1.19 esptool
+        run: pip install platformio esptool
 
       - name: Build firmware
         run: pio run -e m5stick-s3
