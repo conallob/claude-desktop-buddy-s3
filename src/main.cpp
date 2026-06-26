@@ -940,6 +940,14 @@ void drawHUD() {
 }
 
 void setup() {
+  // Blink LED 3× before anything else to confirm app is starting.
+  // LED is active-low on GPIO19; if this blinks, M5.begin() is the culprit.
+  pinMode(19, OUTPUT);
+  for (int i = 0; i < 3; i++) {
+    digitalWrite(19, LOW);  delay(150);
+    digitalWrite(19, HIGH); delay(150);
+  }
+
   auto cfg = M5.config();
   M5.begin(cfg);
   M5.Display.setRotation(0);
